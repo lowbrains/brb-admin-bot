@@ -192,8 +192,10 @@ def ask_model(config, context, key):
     responses = urlparse(endpoint).path.rstrip('/').endswith('/responses')
     user_input = json.dumps(context, ensure_ascii=False)
     if responses:
+        # No temperature: GPT-5 models reject the parameter outright
+        # ("Unsupported parameter: 'temperature' is not supported with this model").
         payload = {'model': config['model'], 'instructions': PROMPT,
-                   'input': user_input, 'temperature': 0.3,
+                   'input': user_input,
                    'max_output_tokens': 5000, 'store': False}
     else:
         payload = {'model': config['model'], 'response_format': {'type': 'json_object'},

@@ -17,6 +17,8 @@ class DiscussionTests(unittest.TestCase):
             self.assertIs(payload['store'],False)
             self.assertEqual(payload['max_output_tokens'],5000)
             self.assertNotIn('messages',payload)
+            # GPT-5 models reject 'temperature' outright — verified on the live API.
+            self.assertNotIn('temperature',payload)
             self.assertEqual(api.call_args.kwargs['project'],'folder')
 
     def test_incomplete_response_never_creates_tasks(self):
