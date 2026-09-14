@@ -17,13 +17,26 @@ curl -m 10 -o /dev/null -w "telegram %{http_code}\n" https://api.telegram.org/bo
 ответа не было — тогда этому адресату нужен прокси (`TELEGRAM_PROXY` или
 `MODEL_PROXY` соответственно), и до выяснения дальше идти не надо.
 
-### 1. Поставить Docker и забрать код
+### 1. Забрать код
+
+Репозиторий закрытый, поэтому серверу нужен **deploy-ключ только на чтение**. Пароли
+и личный ключ владельца на сервер не попадают.
 
 ```bash
-curl -fsSL https://get.docker.com | sh
-git clone git@github.com:<owner>/brb-admin-bot.git /opt/brb-admin-bot
+[ -f ~/.ssh/brb_deploy ] || ssh-keygen -q -t ed25519 -N '' -f ~/.ssh/brb_deploy -C 'brb-admin-bot deploy key'; cat ~/.ssh/brb_deploy.pub
+```
+
+Публичную часть добавить в репозиторий: **Settings → Deploy keys → Add**, галку
+«Allow write access» **не** ставить. Затем:
+
+```bash
+export GIT_SSH_COMMAND='ssh -i ~/.ssh/brb_deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new'
+git clone git@github.com:lowbrains/brb-admin-bot.git /opt/brb-admin-bot
 cd /opt/brb-admin-bot
 ```
+
+Docker на площадке уже стоит — рядом работает `businessincognita-digest`. На чистой
+машине: `curl -fsSL https://get.docker.com | sh`.
 
 ### 2. Прокси — на сервере в Нидерландах не нужен
 
@@ -72,8 +85,20 @@ runtime/data/                           # если переносится нак
 
 ### 4. Остановить ноутбучную копию
 
-**До первого запуска контейнера.** Два приёмника `getUpdates` одновременно — это
-HTTP 409 и потерянные сообщения. Закрыть окно `start.cmd` / `start-ai.cmd` на ноутбуке.
+**До первого запуска контейнера.** Два приёмника `getUpdates` на один токен — это
+HTTP 409 и потерянные сообщения. Закрыть окно `start.cmd` / `start-ai.cmd` на ноутбуке;
+если окон не видно, в PowerShell на той машине:
+
+```powershell
+Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'bot\.ps1|discussion\.py|setup-ai\.py' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+```
+
+Проверить, что связь свободна, надёжнее с сервера — `getUpdates` должен вернуть
+`"ok":true`, а не `409 Conflict: terminated by other getUpdates request`.
+
+Полезно также отсечь накопившиеся апдейты, иначе на старте бот может ответить в группу
+на чьё-то позавчерашнее обращение: взять `update_id` последнего апдейта, прибавить
+единицу и записать как `offset` в `runtime/config/connection.json`.
 
 ### 5. Запуск
 
