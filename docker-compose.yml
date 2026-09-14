@@ -1,0 +1,19 @@
+services:
+  bot:
+    build: .
+    image: brb-admin-bot:local
+    container_name: brb-admin-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # Данные и конфиги живут на хосте, переживают пересборку образа.
+      - ./runtime:/runtime
+    # Второй приёмник Telegram недопустим: getUpdates отдаст 409 и апдейты пропадут.
+    # Перед первым стартом убедиться, что ноутбучная копия остановлена.
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

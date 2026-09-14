@@ -1,0 +1,24 @@
+# Рабочие данные, персональные данные и секреты — никогда в репозиторий.
+# Здесь живут team.txt, discussion.sqlite3, contacts, PDF сессии, конфиги с folder-id.
+runtime/
+
+# Секреты окружения
+.env
+.env.*
+!.env.example
+
+# Состояние и мусор
+__pycache__/
+*.py[cod]
+*.sqlite3
+bot.lock
+tmp/
+
+# macOS / редакторы
+.DS_Store
+Icon?
+.idea/
+.vscode/
+
+# Разовые импортёры с вшитыми ФИО — живут в runtime/scripts-import/
+scripts/import-*.py
