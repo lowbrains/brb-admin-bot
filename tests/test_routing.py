@@ -15,7 +15,9 @@ import discussion
 
 TELEGRAM = 'https://api.telegram.org/bot42:FAKE/getMe'
 YANDEX = 'https://ai.api.cloud.yandex.net/v1/responses'
-PROXY = 'http://tg-proxy:3128'
+OPENAI = 'https://api.openai.com/v1/responses'
+TG_PROXY = 'http://tg-proxy:3128'
+MODEL_PROXY = 'http://model-proxy:3129'
 
 
 def socket_target(url, env):
@@ -37,28 +39,41 @@ class RoutingTests(unittest.TestCase):
 
     def test_direct_when_no_proxy_configured(self):
         self.assertEqual(socket_target(TELEGRAM, {}), 'api.telegram.org')
-        self.assertEqual(socket_target(YANDEX, {}), 'ai.api.cloud.yandex.net')
+        self.assertEqual(socket_target(OPENAI, {}), 'api.openai.com')
 
-    def test_telegram_goes_through_the_proxy(self):
-        self.assertEqual(socket_target(TELEGRAM, {'TELEGRAM_PROXY': PROXY}), 'tg-proxy:3128')
+    def test_telegram_goes_through_its_own_proxy(self):
+        self.assertEqual(socket_target(TELEGRAM, {'TELEGRAM_PROXY': TG_PROXY}), 'tg-proxy:3128')
 
-    def test_model_host_stays_direct_even_with_proxy_set(self):
-        self.assertEqual(socket_target(YANDEX, {'TELEGRAM_PROXY': PROXY}), 'ai.api.cloud.yandex.net')
+    def test_model_goes_through_its_own_proxy(self):
+        self.assertEqual(socket_target(OPENAI, {'MODEL_PROXY': MODEL_PROXY}), 'model-proxy:3129')
+        self.assertEqual(socket_target(YANDEX, {'MODEL_PROXY': MODEL_PROXY}), 'model-proxy:3129')
 
-    def test_model_host_ignores_a_global_environment_proxy(self):
-        """A stray HTTPS_PROXY on the host must not drag the model call abroad."""
-        env = {'TELEGRAM_PROXY': PROXY, 'HTTPS_PROXY': 'http://everything:3128',
-               'https_proxy': 'http://everything:3128'}
-        self.assertEqual(socket_target(YANDEX, env), 'ai.api.cloud.yandex.net')
+    def test_neither_variable_leaks_into_the_other_destination(self):
+        """Which side needs a tunnel depends on where the server stands — a Russian
+        host reaches Yandex but not OpenAI, a foreign host the reverse — so the two
+        routes must stay independent rather than share one hardcoded rule."""
+        self.assertEqual(socket_target(OPENAI, {'TELEGRAM_PROXY': TG_PROXY}), 'api.openai.com')
+        self.assertEqual(socket_target(TELEGRAM, {'MODEL_PROXY': MODEL_PROXY}), 'api.telegram.org')
+
+    def test_both_destinations_can_be_proxied_separately(self):
+        env = {'TELEGRAM_PROXY': TG_PROXY, 'MODEL_PROXY': MODEL_PROXY}
         self.assertEqual(socket_target(TELEGRAM, env), 'tg-proxy:3128')
+        self.assertEqual(socket_target(OPENAI, env), 'model-proxy:3129')
+
+    def test_a_global_environment_proxy_is_never_inherited(self):
+        """A stray HTTPS_PROXY on the host must not silently route anything."""
+        env = {'HTTPS_PROXY': 'http://everything:3128', 'https_proxy': 'http://everything:3128'}
+        self.assertEqual(socket_target(OPENAI, env), 'api.openai.com')
+        self.assertEqual(socket_target(TELEGRAM, env), 'api.telegram.org')
 
     def test_whitespace_proxy_is_ignored(self):
         self.assertEqual(socket_target(TELEGRAM, {'TELEGRAM_PROXY': '   '}), 'api.telegram.org')
+        self.assertEqual(socket_target(OPENAI, {'MODEL_PROXY': '   '}), 'api.openai.com')
 
-    def test_proxied_request_uses_connect_so_the_token_stays_in_tls(self):
+    def test_proxied_request_uses_connect_so_the_secret_stays_in_tls(self):
         """The bot token sits in the Telegram URL path. Over an HTTPS target the
         proxy must only learn host:port, never the path."""
-        with patch.dict(os.environ, {'TELEGRAM_PROXY': PROXY}, clear=True):
+        with patch.dict(os.environ, {'TELEGRAM_PROXY': TG_PROXY}, clear=True):
             discussion._OPENERS.clear()
             with patch('http.client.HTTPSConnection') as connection:
                 connection.return_value.getresponse.return_value = MagicMock(status=999)
