@@ -68,7 +68,9 @@ TELEGRAM_PROXY задана   → через прокси идёт ТОЛЬКО 
 ## Запуск
 
 ```bash
-cp .env.example .env          # вписать токен, ключ, chat_id
+cp .env.example .env                  # вписать токен, ключ, chat_id
+mkdir -p runtime/config runtime/data
+sudo chown -R 10001:10001 runtime     # на Linux обязательно: процесс не от root
 docker compose up -d --build
 docker compose logs -f bot
 ```

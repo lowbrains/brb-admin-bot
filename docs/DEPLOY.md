@@ -66,8 +66,19 @@ curl -m 10 -x "$TELEGRAM_PROXY" -o /dev/null -w "%{http_code}\n" https://api.tel
 cp .env.example .env && chmod 600 .env
 ```
 
-`runtime/` в репозитории нет — он в `.gitignore`. Содержимое переносится отдельно
-(scp, не через git и не через мессенджер):
+`runtime/` в репозитории нет — он в `.gitignore`. Каталог надо создать **и отдать
+пользователю контейнера**: процесс работает не от root, а от `uid 10001`, и на
+свежесозданном root-каталоге получит `Permission denied` при первой же записи в базу.
+
+```bash
+mkdir -p runtime/config runtime/data
+sudo chown -R 10001:10001 runtime
+```
+
+> На macOS этой ошибки не видно — Docker Desktop транслирует UID. Проявляется только
+> на Linux, то есть ровно на сервере. Проверено 14.09.2026.
+
+Содержимое переносится отдельно (scp, не через git и не через мессенджер):
 
 ```
 runtime/team.txt
